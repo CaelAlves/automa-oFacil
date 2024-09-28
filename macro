@@ -1,0 +1,103 @@
+*ta uma bosta ainda
+
+import pyautogui
+import keyboard
+import time
+import tkinter as tk
+from threading import Thread
+import json
+import os
+
+# Lista para armazenar as ações
+macro = []
+recording = False
+
+def record_macro():
+    global recording, macro
+    recording = True
+    macro = []
+    print("Gravando macro... Pressione 'Esc' para parar.")
+    
+    while recording:
+        event = keyboard.read_event()
+        if event.event_type == keyboard.KEY_DOWN:
+            if event.name == 'esc':
+                recording = False
+                print("Gravação parada.")
+                break
+            macro.append(('key', event.name, time.time()))
+        elif event.event_type == keyboard.KEY_UP:
+            macro.append(('key_up', event.name, time.time()))
+        elif event.event_type == keyboard.MOUSE:
+            x, y = pyautogui.position()
+            macro.append(('mouse', event.button, x, y, time.time()))
+
+def play_macro(repetitions):
+    print("Repetindo macro...")
+    if not macro:
+        print("Nenhuma macro gravada.")
+        return
+    for _ in range(repetitions):
+        start_time = macro[0][2]  # Tempo de início
+        for action in macro:
+            time.sleep(action[2] - start_time)  # Espera o tempo correto
+            if action[0] == 'key':
+                keyboard.press(action[1])
+            elif action[0] == 'key_up':
+                keyboard.release(action[1])
+            elif action[0] == 'mouse':
+                pyautogui.click(action[2], action[3])
+
+def save_macro(filename):
+    with open(filename, 'w') as f:
+        json.dump(macro, f)
+    print(f"Macro salva em {filename}")
+
+def load_macro(filename):
+    global macro
+    if os.path.exists(filename):
+        with open(filename, 'r') as f:
+            macro = json.load(f)
+        print(f"Macro carregada de {filename}")
+    else:
+        print(f"Arquivo {filename} não encontrado.")
+
+def start_recording():
+    print("Iniciando gravação...")
+    Thread(target=record_macro).start()
+
+def start_playing():
+    repetitions = int(repetitions_entry.get() or 1)  # Pega o número de repetições ou 1 se vazio
+    Thread(target=lambda: play_macro(repetitions)).start()
+
+# Interface Gráfica
+root = tk.Tk()
+root.title("Macro Recorder")
+
+frame = tk.Frame(root)
+frame.pack(pady=20)
+
+record_button = tk.Button(frame, text="Gravar Macro", command=start_recording)
+record_button.pack(side=tk.LEFT, padx=10)
+
+play_button = tk.Button(frame, text="Repetir Macro", command=start_playing)
+play_button.pack(side=tk.LEFT, padx=10)
+
+stop_button = tk.Button(frame, text="Parar Gravação", command=lambda: globals().update(recording=False))
+stop_button.pack(side=tk.LEFT, padx=10)
+
+# Campo para entrada de repetições
+repetitions_label = tk.Label(root, text="Repetições:")
+repetitions_label.pack(pady=10)
+
+repetitions_entry = tk.Entry(root)
+repetitions_entry.pack(pady=5)
+
+# Botões para salvar e carregar macro
+save_button = tk.Button(root, text="Salvar Macro", command=lambda: save_macro("macro.json"))
+save_button.pack(pady=5)
+
+load_button = tk.Button(root, text="Carregar Macro", command=lambda: load_macro("macro.json"))
+load_button.pack(pady=5)
+
+root.mainloop()
